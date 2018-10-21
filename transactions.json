@@ -1,0 +1,50 @@
+[
+  {
+    "cmd": "deposit",
+    "amount": 100
+  },
+  {
+    "cmd": "withdraw",
+    "amount": 10
+  },
+  {
+    "cmd": "withdraw",
+    "amount": 10
+  },
+  {
+    "cmd": "deposit",
+    "amount": 100
+  },
+  {
+    "cmd": "deposit",
+    "amount": 100
+  },
+  {
+    "cmd": "deposit",
+    "amount": 100
+  },
+  {
+    "cmd": "withdraw",
+    "amount": 100
+  },
+  {
+    "cmd": "withdraw",
+    "amount": 100
+  },
+  {
+    "cmd": "withdraw",
+    "amount": 100
+  },
+  {
+    "cmd": "withdraw",
+    "amount": 45
+  },
+  {
+    "cmd": "withdraw",
+    "amount": 30
+  },
+  {
+    "cmd": "withdraw",
+    "amount": 5
+  }
+]
