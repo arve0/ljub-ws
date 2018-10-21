@@ -1,50 +1,16 @@
 [
   {
-    "cmd": "deposit",
-    "amount": 100
+    "value": {
+      "cmd": "deposit",
+      "amount": 100
+    },
+    "hash": "2c178aa030633cf113b357dcbe68de8a597edcbc30d6799216753163676fc72b"
   },
   {
-    "cmd": "withdraw",
-    "amount": 10
-  },
-  {
-    "cmd": "withdraw",
-    "amount": 10
-  },
-  {
-    "cmd": "deposit",
-    "amount": 100
-  },
-  {
-    "cmd": "deposit",
-    "amount": 100
-  },
-  {
-    "cmd": "deposit",
-    "amount": 100
-  },
-  {
-    "cmd": "withdraw",
-    "amount": 100
-  },
-  {
-    "cmd": "withdraw",
-    "amount": 100
-  },
-  {
-    "cmd": "withdraw",
-    "amount": 100
-  },
-  {
-    "cmd": "withdraw",
-    "amount": 45
-  },
-  {
-    "cmd": "withdraw",
-    "amount": 30
-  },
-  {
-    "cmd": "withdraw",
-    "amount": 5
+    "value": {
+      "cmd": "deposit",
+      "amount": 200
+    },
+    "hash": "a5a5c0b5d08424b580484ba6702238c00e944000ec354e72717f7d3ca4cb9d78"
   }
 ]

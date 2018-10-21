@@ -1,6 +1,7 @@
 const jsonStream = require('duplex-json-stream')
 const net = require('net')
 const fs = require('fs')
+const sodium = require('sodium-native')
 
 const transactions = readTransactions()
 
@@ -43,11 +44,13 @@ server.listen(3876)
 function balance () {
     return {
         cmd: 'balance',
-        balance: transactions.reduce((sum, transaction) => {
-            return transaction.cmd === 'deposit'
-                ? sum + transaction.amount
-                : sum - transaction.amount
-        }, 0)
+        balance: transactions
+            .map(t => t.value)
+            .reduce((sum, transaction) => {
+                return transaction.cmd === 'deposit'
+                    ? sum + transaction.amount
+                    : sum - transaction.amount
+            }, 0)
     }
 }
 
@@ -62,8 +65,7 @@ function logTransaction (cmd, value) {
         hasSufficientFunds(amount)
     }
 
-    transactions.push({ cmd, amount })
-
+    addTransaction({ cmd, amount })
     writeTransactions()
 
     return balance()
@@ -79,8 +81,23 @@ function hasSufficientFunds (amount) {
 
 function readTransactions () {
     try {
-        return JSON.parse(fs.readFileSync('transactions.json'))
-    } catch (_) {
+        let transactions = JSON.parse(fs.readFileSync('transactions.json'))
+
+        if (!Array.isArray(transactions)) {
+            throw new Error('transactions.json is not an array')
+        }
+
+        // if invalid, we throw, and return empty array
+        let prevHash = genesisHash()
+        for (let transaction of transactions) {
+            if (!isValidTransaction(prevHash, transaction)) {
+                throw new Error(`Transaction "${JSON.stringify(transaction)}" is invalid. Previous hash was ${JSON.stringify(prevHash)}.`)
+            }
+
+            prevHash = transaction.hash
+        }
+    } catch (err) {
+        console.log(err)
         return []
     }
 }
@@ -89,6 +106,32 @@ function writeTransactions () {
     fs.writeFileSync('transactions.json', JSON.stringify(transactions, null, 2))
 }
 
-function createHash (str) {
+function addTransaction (transaction) {
+    const prevTransaction = last(transactions) || {}
+    const prevHash = prevTransaction.hash || genesisHash()
 
+    transactions.push({
+        value: transaction,
+        hash: createHash(prevHash + JSON.stringify(transaction))
+    })
+}
+
+function last (arr) {
+    return arr[arr.length - 1]
+}
+
+function genesisHash () {
+    return Buffer.alloc(32).toString('hex')
+}
+
+function createHash (str) {
+    const output = Buffer.alloc(sodium.crypto_generichash_BYTES)
+    const input = Buffer.from(str)
+
+    sodium.crypto_generichash(output, input)
+    return output.toString('hex')
+}
+
+function isValidTransaction (prevHash, transaction) {
+    return createHash(prevHash + JSON.stringify(transaction.value)) === transaction.hash
 }

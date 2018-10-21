@@ -1,7 +1,7 @@
 const sodium = require('sodium-native')
 
 const outputBufferSize = sodium.crypto_generichash_BYTES
-const output = Buffer.alloc(outputBufferSize)
+const output = Buffer.alloc(sodium.crypto_generichash_BYTES)
 
 const input = Buffer.from('Hello, World!')
 
