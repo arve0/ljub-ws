@@ -18,6 +18,8 @@ const server = net.createServer(function (socket) {
         try {
             if (msg.cmd !== 'register' && !customerExists(msg.id)) {
                 throw new Error(`Unknown customer "${id}".`)
+            } else if (invalidSignature(msg)) {
+                throw new Error('Invalid signature.')
             }
 
             switch (msg.cmd) {
@@ -29,7 +31,7 @@ const server = net.createServer(function (socket) {
                     response = logTransaction(msg.cmd, msg.value, msg.id)
                     break
                 case 'register':
-                    response = register(msg.value)
+                    response = register(msg.value, msg.publickey)
                     break
                 default:
                     throw new Error(`Unknown command "${msg.cmd}"`)
@@ -236,16 +238,18 @@ function getCustomers () {
     }
 }
 
-function register (id) {
+function register (id, publicKey) {
     if (typeof id !== 'string') {
         throw new Error(`Id missing. Send id as a string.`)
+    } else if  (typeof publicKey !== 'string') {
+        throw new Error(`Public key missing. Send public key as a string.`)
     }
 
     if (customerExists(id)) {
         throw new Error(`Customer already exists.`)
     }
 
-    customers.push({ id })
+    customers.push({ id, publicKey })
 
     fs.writeFileSync('customers.json', JSON.stringify(customers))
 
@@ -254,4 +258,20 @@ function register (id) {
 
 function customerExists (id) {
     return customers.some(c => c.id === id)
+}
+
+function invalidSignature (msg) {
+    if (msg.cmd === 'register') {
+        return false
+    }
+
+    const storedPublicKey = Buffer.from(customers.find(c => c.id === msg.id).publicKey, 'hex')
+    const signature = Buffer.from(msg.signature, 'hex')
+    delete msg['signature']
+    const message = Buffer.from(JSON.stringify(msg))
+
+    console.log('Validating message:')
+    console.dir(msg)
+
+    return !sodium.crypto_sign_verify_detached(signature, message, storedPublicKey)
 }
