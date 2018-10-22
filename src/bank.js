@@ -3,6 +3,7 @@ const net = require('net')
 const fs = require('fs')
 const sodium = require('sodium-native')
 
+const [publicKey, secretKey] = getPublicAndSecretKey()
 const transactions = readTransactions()
 
 const server = net.createServer(function (socket) {
@@ -88,17 +89,25 @@ function readTransactions () {
         }
 
         // if invalid, we throw, and return empty array
-        let prevHash = genesisHash()
-        for (let transaction of transactions) {
-            if (!isValidTransaction(prevHash, transaction)) {
-                throw new Error(`Transaction "${JSON.stringify(transaction)}" is invalid. Previous hash was ${JSON.stringify(prevHash)}.`)
-            }
+        validateTransactions(transactions);
 
-            prevHash = transaction.hash
-        }
+        return transactions
     } catch (err) {
         console.log(err)
         return []
+    }
+}
+
+function validateTransactions(transactions) {
+    let prevHash = genesisHash();
+
+    for (let transaction of transactions) {
+        if (transactionIsInvalid(prevHash, transaction)) {
+            throw new Error(`Transaction "${JSON.stringify(transaction)}" is invalid. Previous hash was ${JSON.stringify(prevHash)}.`);
+        } else if (signatureIsInvalid(transaction)) {
+            throw new Error(`Failed to verify signature for transaction "${JSON.stringify(transaction)}".`);
+        }
+        prevHash = transaction.hash;
     }
 }
 
@@ -110,10 +119,14 @@ function addTransaction (transaction) {
     const prevTransaction = last(transactions) || {}
     const prevHash = prevTransaction.hash || genesisHash()
 
-    transactions.push({
-        value: transaction,
-        hash: createHash(prevHash + JSON.stringify(transaction))
-    })
+    const value = transaction
+    const hash = createHash(prevHash + JSON.stringify(transaction))
+
+    const signatureBuffer = Buffer.alloc(sodium.crypto_sign_BYTES)
+    sodium.crypto_sign_detached(signatureBuffer, Buffer.from(hash), secretKey)
+    const signature = signatureBuffer.toString('hex')
+
+    transactions.push({ value, hash, signature })
 }
 
 function last (arr) {
@@ -132,6 +145,32 @@ function createHash (str) {
     return output.toString('hex')
 }
 
-function isValidTransaction (prevHash, transaction) {
-    return createHash(prevHash + JSON.stringify(transaction.value)) === transaction.hash
+function transactionIsInvalid (prevHash, transaction) {
+    return createHash(prevHash + JSON.stringify(transaction.value)) !== transaction.hash
+}
+
+function getPublicAndSecretKey () {
+    const publicKeyFilename = 'signkey.pub'
+    const secretKeyFilename = 'signkey'
+
+    if (fs.existsSync(publicKeyFilename) && fs.existsSync(secretKeyFilename)) {
+        return [
+            fs.readFileSync(publicKeyFilename, 'utf8'),
+            fs.readFileSync(secretKeyFilename, 'utf8')
+        ].map(key => Buffer.from(key, 'hex'))
+    }
+
+    const publicKey = Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES)
+    const secretKey = Buffer.alloc(sodium.crypto_sign_SECRETKEYBYTES)
+
+    sodium.crypto_sign_keypair(publicKey, secretKey)
+
+    fs.writeFileSync(publicKeyFilename, publicKey.toString('hex'))
+    fs.writeFileSync(secretKeyFilename, secretKey.toString('hex'))
+
+    return [publicKey, secretKey]
+}
+
+function signatureIsInvalid (transaction) {
+    return !sodium.crypto_sign_verify_detached(Buffer.from(transaction.signature, 'hex'), Buffer.from(transaction.hash), publicKey)
 }
