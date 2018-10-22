@@ -1,7 +1,7 @@
 const sodium = require('sodium-native')
 const fs = require('fs')
 
-const secretKey = Buffer.from(fs.readFileSync('encrypt.key', 'utf8'), 'hex')
+const secretKey = fs.readFileSync('encrypt.key')
 const message = Buffer.from(process.argv[2])
 
 const nonce = Buffer.alloc(sodium.crypto_secretbox_NONCEBYTES)

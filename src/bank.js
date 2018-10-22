@@ -4,6 +4,7 @@ const fs = require('fs')
 const sodium = require('sodium-native')
 
 const [publicKey, secretKey] = getPublicAndSecretKey()
+const encryptKey = getEncryptKey()
 const transactions = readTransactions()
 
 const server = net.createServer(function (socket) {
@@ -82,10 +83,11 @@ function hasSufficientFunds (amount) {
 
 function readTransactions () {
     try {
-        let transactions = JSON.parse(fs.readFileSync('transactions.json'))
+        let decrypted = decrypt(fs.readFileSync('transactions'))
+        let transactions = JSON.parse(decrypted)
 
         if (!Array.isArray(transactions)) {
-            throw new Error('transactions.json is not an array')
+            throw new Error('transactions is not an array')
         }
 
         // if invalid, we throw, and return empty array
@@ -112,7 +114,7 @@ function validateTransactions(transactions) {
 }
 
 function writeTransactions () {
-    fs.writeFileSync('transactions.json', JSON.stringify(transactions, null, 2))
+    fs.writeFileSync('transactions', encrypt(JSON.stringify(transactions)))
 }
 
 function addTransaction (transaction) {
@@ -173,4 +175,45 @@ function getPublicAndSecretKey () {
 
 function signatureIsInvalid (transaction) {
     return !sodium.crypto_sign_verify_detached(Buffer.from(transaction.signature, 'hex'), Buffer.from(transaction.hash), publicKey)
+}
+
+function getEncryptKey () {
+    const filename = 'encrypt.key'
+
+    if (fs.existsSync(filename)) {
+        return fs.readFileSync(filename)
+    }
+
+    const key = Buffer.alloc(sodium.crypto_secretbox_KEYBYTES)
+    sodium.randombytes_buf(key)
+
+    fs.writeFileSync('encrypt.key', key)
+
+    return key
+}
+
+function encrypt (data) {
+    const message = Buffer.from(data)
+
+    const nonce = Buffer.alloc(sodium.crypto_secretbox_NONCEBYTES)
+    sodium.randombytes_buf(nonce)
+
+    const cipher = Buffer.alloc(message.length + sodium.crypto_secretbox_MACBYTES)
+
+    sodium.crypto_secretbox_easy(cipher, message, nonce, encryptKey)
+
+    fs.writeFileSync('current-nonce', nonce)
+
+    return cipher
+}
+
+function decrypt (cipher) {
+    const nonce = fs.readFileSync('current-nonce')
+    const message = Buffer.alloc(cipher.length - sodium.crypto_secretbox_MACBYTES)
+
+    if (sodium.crypto_secretbox_open_easy(message, cipher, nonce, encryptKey)) {
+        return message.toString()
+    } else {
+        throw new Error('Unable to decrypt transaction log.')
+    }
 }
