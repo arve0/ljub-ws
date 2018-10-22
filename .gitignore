@@ -4,3 +4,4 @@ signkey.pub
 encrypt.key
 current-nonce
 transactions
+customers.json

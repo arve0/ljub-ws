@@ -6,6 +6,7 @@ const sodium = require('sodium-native')
 const [publicKey, secretKey] = getPublicAndSecretKey()
 const encryptKey = getEncryptKey()
 const transactions = readTransactions()
+const customers = getCustomers()
 
 const server = net.createServer(function (socket) {
     socket = jsonStream(socket)
@@ -15,13 +16,20 @@ const server = net.createServer(function (socket) {
 
         let response
         try {
+            if (msg.cmd !== 'register' && !customerExists(msg.id)) {
+                throw new Error(`Unknown customer "${id}".`)
+            }
+
             switch (msg.cmd) {
                 case 'balance':
-                    response = balance()
+                    response = balance(msg.id)
                     break
                 case 'deposit':
                 case 'withdraw':
-                    response = logTransaction(msg.cmd, msg.value)
+                    response = logTransaction(msg.cmd, msg.value, msg.id)
+                    break
+                case 'register':
+                    response = register(msg.value)
                     break
                 default:
                     throw new Error(`Unknown command "${msg.cmd}"`)
@@ -43,11 +51,12 @@ const server = net.createServer(function (socket) {
 
 server.listen(3876)
 
-function balance () {
+function balance (id) {
     return {
         cmd: 'balance',
         balance: transactions
             .map(t => t.value)
+            .filter(t => t.id === id)
             .reduce((sum, transaction) => {
                 return transaction.cmd === 'deposit'
                     ? sum + transaction.amount
@@ -56,7 +65,7 @@ function balance () {
     }
 }
 
-function logTransaction (cmd, value) {
+function logTransaction (cmd, value, id) {
     let amount = parseFloat(value)
 
     if (isNaN(amount)) {
@@ -64,17 +73,17 @@ function logTransaction (cmd, value) {
     }
 
     if (cmd === 'withdraw') {
-        hasSufficientFunds(amount)
+        hasSufficientFunds(amount, id)
     }
 
-    addTransaction({ cmd, amount })
+    addTransaction({ cmd, amount, id })
     writeTransactions()
 
-    return balance()
+    return balance(id)
 }
 
-function hasSufficientFunds (amount) {
-    let currentBalance = balance().balance
+function hasSufficientFunds (amount, id) {
+    let currentBalance = balance(id).balance
 
     if (amount > currentBalance) {
         throw new Error(`Unable to withdraw ${amount} when current funds are ${currentBalance}.`)
@@ -216,4 +225,33 @@ function decrypt (cipher) {
     } else {
         throw new Error('Unable to decrypt transaction log.')
     }
+}
+
+function getCustomers () {
+    try {
+        return JSON.parse(fs.readFileSync('customers.json'))
+    } catch (err) {
+        console.error(err)
+        return []
+    }
+}
+
+function register (id) {
+    if (typeof id !== 'string') {
+        throw new Error(`Id missing. Send id as a string.`)
+    }
+
+    if (customerExists(id)) {
+        throw new Error(`Customer already exists.`)
+    }
+
+    customers.push({ id })
+
+    fs.writeFileSync('customers.json', JSON.stringify(customers))
+
+    return { cmd: 'register', id }
+}
+
+function customerExists (id) {
+    return customers.some(c => c.id === id)
 }

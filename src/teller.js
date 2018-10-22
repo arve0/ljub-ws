@@ -5,6 +5,7 @@ const client = jsonStream(net.connect(3876))
 
 const cmd = process.argv[2] || 'balance'
 const value = process.argv[3] || null
+const id = process.argv[4] || '1'
 
 client.on('data', function (msg) {
   console.log('Teller received:', msg)
@@ -14,4 +15,5 @@ client.on('data', function (msg) {
 client.write({
     cmd,
     value,
+    id,
 })
