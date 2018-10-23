@@ -1,41 +1,19 @@
-const jsonStream = require('duplex-json-stream')
-const net = require('net')
-const fs = require('fs')
-const sodium = require('sodium-native')
+const { commands, sign, send } = require('./teller-functions.js')
 
-const client = jsonStream(net.connect(3876))
+async function main () {
+  try {
+    const cmd = process.argv[2] || 'balance'
+    const message = commands[cmd](...process.argv.slice(3))
 
-const cmd = process.argv[2] || 'balance'
-const value = process.argv[3] || null
-const id = process.argv[4] || '1'
+    process.stdout.write('Sending: ')
+    console.dir(message)
 
-client.on('data', function (msg) {
-  console.log('Teller received:', msg)
-  client.end()
-})
-
-let message = { cmd, value, id }
-
-if (cmd === 'register') {
-  const publicKey = Buffer.alloc(sodium.crypto_sign_PUBLICKEYBYTES)
-  const secretKey = Buffer.alloc(sodium.crypto_sign_SECRETKEYBYTES)
-
-  sodium.crypto_sign_keypair(publicKey, secretKey)
-  fs.writeFileSync('customer-public-' + id, publicKey)
-  fs.writeFileSync('customer-secret-' + id, secretKey)
-
-  message.publickey = publicKey.toString('hex')
-} else {
-  const secretKey = fs.readFileSync('customer-secret-' + id)
-  const signature = Buffer.alloc(sodium.crypto_sign_BYTES)
-
-  console.log('Signing message:')
-  console.dir(message)
-
-  sodium.crypto_sign_detached(signature, Buffer.from(JSON.stringify(message)), secretKey)
-
-  message.signature = signature.toString('hex')
+    let response = await send(sign(message))
+    console.log('Got response:', response)
+  } catch (err) {
+    console.error('Reponse ERROR:', err)
+    process.exit(1)
+  }
 }
 
-
-client.write(message)
+main()

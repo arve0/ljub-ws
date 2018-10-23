@@ -1,12 +1,14 @@
 {
   "scripts": {
-    "start": "nodemon src/bank.js"
+    "start": "nodemon src/bank.js",
+    "test": "mocha src/test.js"
   },
   "dependencies": {
     "duplex-json-stream": "^1.0.1",
     "sodium-native": "^2.2.2"
   },
   "devDependencies": {
+    "mocha": "^5.2.0",
     "nodemon": "^1.18.4"
   }
 }
